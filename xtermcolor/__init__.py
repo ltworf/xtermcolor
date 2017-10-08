@@ -1,6 +1,30 @@
 from os import isatty, environ, write
+from sys import stdout
 
 from xtermcolor.ColorMap import XTermColorMap, VT100ColorMap
+
+_cmap = None
+
+def _init():
+    global _cmap
+    term = environ.get('TERM')
+    if term.startswith('xterm'):
+        _cmap = XTermColorMap()
+    elif term == 'vt100':
+        _cmap = VT100ColorMap()
+_init()
+
+
+def cprint(value, *args, sep=' ', end='\n', file=stdout, flush=False, fg=None, bg=None, ansifg=None, ansibg=None):
+    '''
+    This function is similar to print, but adds named parameters for
+    the colors.
+    '''
+    outstring = ' '.join(str(i) for i in (value,) + args)
+    if any([fg, bg, ansifg, ansibg]) and file.isatty() and _cmap:
+        outstring = _cmap.colorize(outstring, fg, ansifg, bg, ansibg)
+
+    print(outstring, sep=sep, end=end, file=file, flush=flush)
 
 
 def colorize(string, rgb=None, ansi=None, bg=None, ansi_bg=None, fd=1):
@@ -19,29 +43,7 @@ def colorize(string, rgb=None, ansi=None, bg=None, ansi_bg=None, fd=1):
     fd     = The file descriptor that will be used by print, by default is the
              stdout
     '''
-
-    #Reinitializes if fd used is different
-    if colorize.fd != fd:
-        colorize.init = False
-        colorize.fd = fd
-
-    #Checks if it is on a terminal, and if the terminal is recognized
-    if not colorize.init:
-        colorize.init = True
-        colorize.is_term = isatty(fd)
-        if 'TERM' in environ:
-            if environ['TERM'].startswith('xterm'):
-                colorize.cmap = XTermColorMap()
-            elif environ['TERM'] == 'vt100':
-                colorize.cmap = VT100ColorMap()
-            else:
-                colorize.is_term = False
-        else:
-            colorize.is_term = False
-
-    if colorize.is_term:
-        string = colorize.cmap.colorize(string, rgb, ansi, bg, ansi_bg)
+    if isatty(fd):
+        string = _cmap.colorize(string, rgb, ansi, bg, ansi_bg)
 
     return string
-colorize.init = False
-colorize.fd = 1
